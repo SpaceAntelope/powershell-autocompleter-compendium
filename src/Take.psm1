@@ -71,6 +71,7 @@ function Take {
     begin { 
         $StartConditionMet = $false
         $StopConditionMet = $false
+        $StartConditionAge = 0
         
         if (-not $From) {
             $StartConditionMet = $true
@@ -85,31 +86,30 @@ function Take {
         $vars = [List[psvariable]]::new()
         $vars.Add([psvariable]::new("_", $_))
 
-        if ($inclusive) {
-            $StartConditionMet = $StartConditionMet ? $true : $From.InvokeWithContext($null, $vars)
+        if ($StartConditionMet) {
+            $StartConditionAge++
+        }
+       
+        if ($inclusive -and -not $StartConditionMet) {
+            <# After condition met, don't run From() again #>
+            $StartConditionMet = $From.InvokeWithContext($null, $vars)
         }
 
-        if (-not $inclusive) {
-            $StopConditionMet = $StopConditionMet ? $true : ($Until.InvokeWithContext($null, $vars) -and $StartConditionMet)
+        if (-not $inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
+            <# Age > 0 prevents terminal condition from being set immediately if it is the same as the start condition #>
+            $StopConditionMet = $Until.InvokeWithContext($null, $vars)
         }
         
         if ($StartConditionMet -and -not $StopConditionMet) {
             $_
         }
 
-        if ($inclusive) {
-            $StopConditionMet = $StopConditionMet ? $true : ($Until.InvokeWithContext($null, $vars) -and $StartConditionMet)
+        if ($inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
+            $StopConditionMet = $Until.InvokeWithContext($null, $vars)
         }
 
-        if (-not $inclusive) {
-            $StartConditionMet = $StartConditionMet ? $true : $From.InvokeWithContext($null, $vars)
+        if (-not $inclusive -and -not $StartConditionMet) {
+            $StartConditionMet = $From.InvokeWithContext($null, $vars)
         }
     }
 }
-
-# 1..15 | Take -from { $_ -eq 5 } -Until { $_ -eq 10 } -Inclusive  | Join | % { write-host -f green $_ }
-# 1..15 | Take -from { $_ -eq 5 } -Until { $_ -eq 10 }  | Join | % { write-host -f blue $_ } 
-# 1..15 | Take -from { $_ -eq 5 } | Join | % { write-host -f magenta $_ } 
-# 1..15 | Take -from { $_ -eq 5 } -Inclusive | Join | % { write-host -f magenta $_ } 
-# 1..15 | Take -Until { $_ -eq 10 }  | Join | % { write-host -f yellow $_ } 
-# 1..15 | Take -Until { $_ -eq 10 } -Inclusive  | Join | % { write-host -f yellow $_ } 

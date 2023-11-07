@@ -60,38 +60,51 @@ function Should-HaveSameProperties {
     }
 }
 
-function Should-HaveSameMembersInOrder {
+function Should-HaveSameMembersInSameOrder {
     param(
-        [Parameter(Mandatory)]
-        [ValidateNotNull()]
-        [array]
         $ActualValue,
-        [Parameter(Mandatory)]
-        [ValidateNotNull()]
         [array]$ExpectedValue,
-        [Parameter()]
         [switch] $Negate, 
-        [Parameter()]
         [string] $Because
     )
 
-    if ($ActualValue.Count -ne $ExpectedValue) {
-        $failureMessage = "Arrays have different lengths ($($ActualValue.Count) -ne $($ExpectedValue.Count)"
-    } else {
+    if ($ActualValue.Count -ne $ExpectedValue.Count) {
+        $failureMessage = "Arrays have different lengths, expected count to be $($ExpectedValue.Count) but got $($ActualValue.Count)"
+    }
+    else {
         for ($i = 0; $i -lt $ActualValue.Count; $i++) {
-            if 
+            $actual = $ActualValue[$i]
+            $expected = $ExpectedValue[$i]
+
+            if ($actual -ne $expected) {
+                $failureMessage = "At index $i element was expected to be $expected but was $actual"
+                break;
+            }
         }
     }
+
+    [PSCustomObject]@{
+        Succeeded      = $Negate ? [bool]$failureMessage : -not $failureMessage
+        FailureMessage = $failureMessage -and $Because ? "$failureMessage because $because" : $failureMessage
+    }
 }
+# }
 
 # try {
 #     Get-ShouldOperator HaveSameProperties
 # }
 # catch {
 
-    Add-ShouldOperator -Name HaveSameProperties  `
-        -Alias EQV `
-        -InternalName 'Should-HaveSameProperties' `
-        -Test ${function:Should-HaveSameProperties} `
-        -SupportsArrayInput
+Add-ShouldOperator -Name HaveSameProperties  `
+    -Alias EQV `
+    -InternalName 'Should-HaveSameProperties' `
+    -Test ${function:Should-HaveSameProperties} `
+    -SupportsArrayInput
+
+Add-ShouldOperator -Name Should-HaveSameMembersInSameOrder  `
+    -Alias BeEqualArray `
+    -InternalName 'Should-HaveSameMembersInSameOrder' `
+    -Test ${function:Should-HaveSameMembersInSameOrder} `
+    -SupportsArrayInput
+    
 # }
