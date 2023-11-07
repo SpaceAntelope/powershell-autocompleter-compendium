@@ -16,15 +16,19 @@ function escape {
 }
 
 function parseDotnetHelp() {
-    $raw = dotnet list package --help 
+    $raw = dotnet list --help 
 
     $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
     $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ }
 
-    ($options -join "`n") -split "`n\s*\-"
+    [PSCustomObject]@{
+        Commands = $commands
+        Options  = ($options -join "`n") -split "`n\s*(?=\-)"
+    }
+    
 }
 
-parseDotNetHelp
+# (parseDotNetHelp) | fl
 
 $dotnet_scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
