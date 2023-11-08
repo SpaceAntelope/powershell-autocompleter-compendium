@@ -1,8 +1,14 @@
 using namespace System.Management.Automation
 
+
 . $PSScriptRoot/common.ps1
-. $PSScriptRoot/Take.ps1
-. $PSScriptRoot/Sort-Reverse.ps1
+# . $PSScriptRoot/Sort-Reverse.ps1
+remove-module $PSScriptRoot/Take.psm1 -force -ErrorAction Ignore
+import-module $PSScriptRoot/Take.psm1
+
+function returnMatch ($source, $pattern) {
+    [regex]::Match($source, $pattern).Value
+}
 
 function escape {
     [CmdletBinding()]
@@ -14,47 +20,79 @@ function escape {
 
     [regex]::Escape($str)
 }
+filter cleanup { $_.Trim() -replace "\s{2,}", " " } 
 
-function parseDotnetHelp() {
-    $raw = dotnet list --help 
-
+function ExctractParseables($raw) {
     $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
-    $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ }
+    $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ } 
 
     [PSCustomObject]@{
-        Commands = $commands
-        Options  = ($options -join "`n") -split "`n\s*(?=\-)"
+        Commands = $commands | cleanup
+        Options  = ($options -join "`n") -split "`n\s*(?=\-)" | cleanup
     }
-    
 }
 
-# (parseDotNetHelp) | fl
+function ParseOption([string]$line) {
+    $options = returnMatch $line.Trim() "^(\-\-?[^,\s]+(,\s*)?)+" | cleanup
+    $_args = returnMatch $line.Trim() "<[^>]+>`$"
+    $helpText = ($line -replace "^$(escape $options)") | cleanup
+
+    $options -split ",\s*" 
+    | ForEach-Object { 
+        [pscustomobject]@{
+            Name     = $_;
+            Args     = $_args
+            HelpText = $helpText 
+        }
+    }
+}
+
+function ParseCommand([string]$line) {
+    $cmd = returnMatch $line "^[^\s]+"
+    $helpText = ($line -replace "^$(escape $cmd)") | cleanup
+
+    [pscustomobject]@{
+        Name     = $cmd;
+        HelpText = $helpText 
+    }
+}
 
 $dotnet_scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $commandline = $commandAst.CommandElements 
-    | Take-While { 
-        $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete) 
-    }
+    | Take-While { $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete) }
+
     $commandline = $commandline.Value -join " "
 
-    $help = Invoke-Expression "$commandline --help" | Take -from { $_ -match "Options:`$" }
-    $help | % { write-host -f green $_ }
+    $help = Invoke-Expression "$commandline --help"
+    # $help | ForEach-Object { write-host -f green $_ }
+
+    $index = ExctractParseables $help | ForEach-Object { $result = @{} } { 
+        $_.Commands | ForEach-Object { ParseCommand $_ } | ForEach-Object { $result[$_.Name] = $_ }
+        $_.Options | ForEach-Object { ParseOption $_ } | ForEach-Object { $result[$_.Name] = $_ }
+    } { $result }
+
     dotnet complete --position $cursorPosition $commandAst.ToString() 
-    | ForEach-Object {
-        $helpLine = $help -match "(?(^\s+\-)$(escape $_)|\-^\s+$(escape $_))" #?.Replace($_,"")?.Trim()
-        if ($helpLine) {
-            write-host $helpLine
-            $opts = [regex]::Match($helpline, "^\s+(\-\-?[^,\s]+(, )?)+|^\s+[^\s]+").Value.Trim()
-            $rx = [regex]::new((escape $opts))
-            $toolTip = $rx.Replace($helpLine, "", 1).Trim()
+    | ForEach-Object { 
+        $helpLine = $index[$_]
+        
+        # _] $help -match "(?(^\s+\-)$(escape $_)|\-^\s+$(escape $_))" #?.Replace($_,"")?.Trim()
+        # if ($helpLine) {
+        #     write-host $helpLine
+        #     $opts = [regex]::Match($helpline, "^\s+(\-\-?[^,\s]+(, )?)+|^\s+[^\s]+").Value.Trim()
+        #     $rx = [regex]::new((escape $opts))
+        #     $toolTip = $rx.Replace($helpLine, "", 1).Trim()
+        # }
+        # else {
+        #     write-host not in help: $_
+        #     $toolTip = $_
+        # }
+        if ($helpline) {
+            [CompletionResult]::new($helpLine.Name, "$($helpLine.Name) $($helpLine.Args)".Trim(), [CompletionResultType]::ParameterValue, $helpLine.HelpText)
+        } else {
+            [CompletionResult]::new($_, $_, [CompletionResultType]::ParameterValue, $_)
         }
-        else {
-            write-host not in help: $_
-            $toolTip = $_
-        }
-        [CompletionResult]::new($_, $_, [CompletionResultType]::ParameterValue, $toolTip)
     }
 }
 

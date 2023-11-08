@@ -7,13 +7,24 @@ function Should-HaveSameProperties {
     )
     $x = $ActualValue
     $y = $ExpectedValue
-
+    
     function simpleDeepEquality ($x, $y) {
+        $xProps = $x.GetType().GetProperties().Name ?? $x.psobject.Properties.Name
+        $yProps = $y.GetType().GetProperties().Name ?? $y.psobject.Properties.Name
+
         if (($null -eq $x -or $null -eq $y) -and $x -ne $y) {
             $failureMessage = "one of the compared objects is null. Are you comparing arrays of different size? Non-null item is $(ConvertTo-Json ($x ?? $y))"
         }
         elseif ($x.GetType() -ne $y.GetType()) {
             $failureMessage = "Objects are of different type: [$($x.GetType())] != [$($y.GetType())]"
+        }
+        elseif (Compare-Object $xProps $yProps) {
+            $diff = switch (Compare-Object $xProps $yProps) {
+                { $_.SideIndicator -eq "=>" } { "- $($_.InputObject) property expected but not found" }
+                { $_.SideIndicator -eq "<=" } { "- $($_.InputObject) found but not expected" }
+            }
+            
+            $failureMessage = "Objects have different sets of properties:`n$diff"
         }
         else {
             $x.gettype().GetProperties().Name 
@@ -37,8 +48,11 @@ function Should-HaveSameProperties {
         }        
     }
 
-    if ($x -is [array] -and $x?.count -ne $y?.count) {
-        $failureMessage = "Arrays of different size or only one item is array. Actual is $($x?.GetType()) while Expected is $($y?.GetType())"
+    if ($null -eq $x) {
+        $failureMessage = "Actual object is null. Use -BeNullOrEmpty operator instead of -HaveSameProperties."
+    }
+    elseif ($x -is [array] -and $x.count -ne $y.count) {
+        $failureMessage = "Arrays of different size or only one item is array. Actual is $($x.count) while Expected is $($y.count)"
     }
     else {
         for ($i = 0; $i -lt $x.Count; $i++) {
