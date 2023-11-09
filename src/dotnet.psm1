@@ -23,13 +23,23 @@ function escape {
 filter cleanup { $_.Trim() -replace "\s{2,}", " " } 
 
 function ExctractParseables($raw) {
-    $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
-    $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ } 
+    $raw -match "(?<=commands|options).*:" | % { 
+        $kind = $_
 
-    [PSCustomObject]@{
-        Commands = $commands | cleanup
-        Options  = ($options -join "`n") -split "`n\s*(?=\-)" | cleanup
+        $parseable = $raw | Take -from { $_ -eq $kind } -Until { isEmpty $_ }
+       
+        [PSCustomObject]@{
+            Kind = $kind.Trim(" :")
+            Text = $parseable
+        }
     }
+    # $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
+    # $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ } 
+
+    # [PSCustomObject]@{
+    #     Commands = $commands | cleanup
+    #     Options  = ($options -join "`n") -split "`n\s*(?=\-)" | cleanup
+    # }
 }
 
 function ParseOption([string]$line) {
