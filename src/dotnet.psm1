@@ -23,14 +23,14 @@ function escape {
 filter cleanup { $_.Trim() -replace "\s{2,}", " " } 
 
 function ExctractParseables($raw) {
-    $raw -match "(?<=commands|options).*:" | % { 
+    $raw -match "(?<=commands|options).*:" | ForEach-Object { 
         $kind = $_
 
-        $parseable = $raw | Take -from { $_ -eq $kind } -Until { isEmpty $_ }
+        $parseable = $raw | Take -from { $_ -eq $kind } -Until { isEmpty $_ } #| cleanup
        
         [PSCustomObject]@{
             Kind = $kind.Trim(" :")
-            Text = $parseable
+            Text = ($parseable -join "`n") -split "`n  (?=[\w\-])"
         }
     }
     # $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
@@ -58,7 +58,7 @@ function ParseOption([string]$line) {
 }
 
 function ParseCommand([string]$line) {
-    $cmd = returnMatch $line "^[^\s]+"
+    $cmd = returnMatch $line.Trim() "^[^\s]+"
     $helpText = ($line -replace "^$(escape $cmd)") | cleanup
 
     [pscustomobject]@{
@@ -78,9 +78,14 @@ $dotnet_scriptblock = {
     $help = Invoke-Expression "$commandline --help"
     # $help | ForEach-Object { write-host -f green $_ }
 
-    $index = ExctractParseables $help | ForEach-Object { $result = @{} } { 
-        $_.Commands | ForEach-Object { ParseCommand $_ } | ForEach-Object { $result[$_.Name] = $_ }
-        $_.Options | ForEach-Object { ParseOption $_ } | ForEach-Object { $result[$_.Name] = $_ }
+    $index = ExctractParseables $help | ForEach-Object { $result = @{} } {
+        $helpLine = switch ($_) {
+            { $_.Kind -match "command" } { ParseCommand $_.Text }
+            { $_.Kind -match "option" } { ParseOption $_.Text }
+        }
+        $helpLine | ForEach-Object { $result[$_.Name] = $_ }
+        # $_.Commands | ForEach-Object { ParseCommand $_ } | ForEach-Object { $result[$_.Name] = $_ }
+        # $_.Options | ForEach-Object { ParseOption $_ } | ForEach-Object { $result[$_.Name] = $_ }
     } { $result }
 
     dotnet complete --position $cursorPosition $commandAst.ToString() 
@@ -100,7 +105,8 @@ $dotnet_scriptblock = {
         # }
         if ($helpline) {
             [CompletionResult]::new($helpLine.Name, "$($helpLine.Name) $($helpLine.Args)".Trim(), [CompletionResultType]::ParameterValue, $helpLine.HelpText)
-        } else {
+        }
+        else {
             [CompletionResult]::new($_, $_, [CompletionResultType]::ParameterValue, $_)
         }
     }
