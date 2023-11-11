@@ -111,4 +111,14 @@ InModuleScope Take {
             $actual | Should -BeEqualArray $expected
         }
     }
+
+    Context "Emulate take while" {
+        it "Take while < 7" {
+            $expected = 1..6
+
+            $actual = 1..10 | Take -Until { -not ( $_ -lt 7 ) }
+
+            $actual | Should -BeEqualArray $expected
+        }
+    }
 }

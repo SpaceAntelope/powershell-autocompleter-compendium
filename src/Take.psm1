@@ -64,6 +64,9 @@ function Take {
         [scriptblock]
         $Until,
         [Parameter()]
+        [scriptblock]
+        $While,
+        [Parameter()]
         [switch]
         $Inclusive
     )
@@ -79,7 +82,7 @@ function Take {
 
         if (-not $Until) {
             $Until = { $false }
-        }
+        }        
     }
 
     process {
