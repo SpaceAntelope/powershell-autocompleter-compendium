@@ -22,3 +22,7 @@ function escape {
 }
 
 function isEmpty ($str) { [string]::IsNullOrWhitespace($str) }
+
+function returnMatch ($source, $pattern) {
+    [regex]::Match($source, $pattern).Value
+}

@@ -6,20 +6,7 @@ using namespace System.Management.Automation
 remove-module $PSScriptRoot/Take.psm1 -force -ErrorAction Ignore
 import-module $PSScriptRoot/Take.psm1
 
-function returnMatch ($source, $pattern) {
-    [regex]::Match($source, $pattern).Value
-}
 
-function escape {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
-        [string]
-        $str
-    )
-
-    [regex]::Escape($str)
-}
 filter cleanup { $_.Trim() -replace "\s{2,}", " " } 
 
 function ExctractParseables($raw) {
@@ -30,24 +17,17 @@ function ExctractParseables($raw) {
        
         [PSCustomObject]@{
             Kind = $kind.Trim(" :")
-            Text = ($parseable -join "`n") -split "`n  (?=[\w\-])"
+            Text = ($parseable -join "`n") -split "`n\s{2}(?=[\w\-])"
         }
     }
-    # $commands = $raw | Take -From { $_ -match "Commands:" } -Until { isEmpty $_ }
-    # $options = $raw | Take -From { $_ -match "Options:" } -Until { isEmpty $_ } 
-
-    # [PSCustomObject]@{
-    #     Commands = $commands | cleanup
-    #     Options  = ($options -join "`n") -split "`n\s*(?=\-)" | cleanup
-    # }
 }
 
 function ParseOption([string]$line) {
-    $options = returnMatch $line.Trim() "^(\-\-?[^,\s]+(,\s*)?)+" | cleanup
+    $options = returnMatch $line.Trim() "^(\-\-?[^,\s\|]+(,\s*|\|)?)+" | cleanup
     $_args = returnMatch $line.Trim() "<[^>]+>`$"
-    $helpText = ($line -replace "^$(escape $options)") | cleanup
+    $helpText = ($line -replace "^\s*$(escape $options)") | cleanup
 
-    $options -split ",\s*" 
+    $options -split ",\s*|\|" 
     | ForEach-Object { 
         [pscustomobject]@{
             Name     = $_;
@@ -59,7 +39,7 @@ function ParseOption([string]$line) {
 
 function ParseCommand([string]$line) {
     $cmd = returnMatch $line.Trim() "^[^\s]+"
-    $helpText = ($line -replace "^$(escape $cmd)") | cleanup
+    $helpText = ($line -replace "^\s*$(escape $cmd)") | cleanup
 
     [pscustomobject]@{
         Name     = $cmd;
@@ -71,38 +51,26 @@ $dotnet_scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $commandline = $commandAst.CommandElements 
-    | Take-While { $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete) }
+    | Take -Until { -not(  $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete)) }
 
     $commandline = $commandline.Value -join " "
 
     $help = Invoke-Expression "$commandline --help"
-    # $help | ForEach-Object { write-host -f green $_ }
 
     $index = ExctractParseables $help | ForEach-Object { $result = @{} } {
         $helpLine = switch ($_) {
-            { $_.Kind -match "command" } { ParseCommand $_.Text }
-            { $_.Kind -match "option" } { ParseOption $_.Text }
+            { $_.Kind -match "command" } { $_.Text | ForEach-Object { ParseCommand $_ } }
+            { $_.Kind -match "option" } { $_.Text | ForEach-Object { ParseOption $_ } }
         }
+        
         $helpLine | ForEach-Object { $result[$_.Name] = $_ }
-        # $_.Commands | ForEach-Object { ParseCommand $_ } | ForEach-Object { $result[$_.Name] = $_ }
-        # $_.Options | ForEach-Object { ParseOption $_ } | ForEach-Object { $result[$_.Name] = $_ }
+        
     } { $result }
 
     dotnet complete --position $cursorPosition $commandAst.ToString() 
     | ForEach-Object { 
         $helpLine = $index[$_]
         
-        # _] $help -match "(?(^\s+\-)$(escape $_)|\-^\s+$(escape $_))" #?.Replace($_,"")?.Trim()
-        # if ($helpLine) {
-        #     write-host $helpLine
-        #     $opts = [regex]::Match($helpline, "^\s+(\-\-?[^,\s]+(, )?)+|^\s+[^\s]+").Value.Trim()
-        #     $rx = [regex]::new((escape $opts))
-        #     $toolTip = $rx.Replace($helpLine, "", 1).Trim()
-        # }
-        # else {
-        #     write-host not in help: $_
-        #     $toolTip = $_
-        # }
         if ($helpline) {
             [CompletionResult]::new($helpLine.Name, "$($helpLine.Name) $($helpLine.Args)".Trim(), [CompletionResultType]::ParameterValue, $helpLine.HelpText)
         }
