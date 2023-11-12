@@ -5,24 +5,24 @@ Remove-Module dotnet -Force -ErrorAction Ignore
 $module = "$PSScriptRoot/../src/dotnet.psm1" 
 
 BeforeDiscovery {
-  Remove-Module "$PSScriptRoot/CustomAssertions.psm1" -Force -ErrorAction Ignore
-  if (-not (Get-Module CustomAssertions)) {
-    Import-Module "$PSScriptRoot/CustomAssertions.psm1" -DisableNameChecking -Force    
-  }
+    Remove-Module "$PSScriptRoot/CustomAssertions.psm1" -Force -ErrorAction Ignore
+    if (-not (Get-Module CustomAssertions)) {
+        Import-Module "$PSScriptRoot/CustomAssertions.psm1" -DisableNameChecking -Force    
+    }
 }
 
 Import-Module $module -force
 
 InModuleScope dotnet {
 
-  Describe "Internal text -> structured output" {
-    BeforeAll {
-      . $PSScriptRoot/../src/common.ps1
-      . $PSScriptRoot/common.ps1
+    Describe "Internal text -> structured output" {
+        BeforeAll {
+            . $PSScriptRoot/../src/common.ps1
+            . $PSScriptRoot/common.ps1
 
-      filter objectify { [pscustomobject]$_ }
+            filter objectify { [pscustomobject]$_ }
 
-      $dotnet_list = @"
+            $dotnet_list = @"
 Description:
   List references or packages of a .NET project.
                                                                                                                                                                                                                                                                                     
@@ -41,7 +41,7 @@ Commands:
   reference  List all project-to-project references of the project.
 "@ -split "`r?`n"
 
-      $dotnet_list_package = @"
+            $dotnet_list_package = @"
 Description:
 List all package references of the project or solution.
 
@@ -82,7 +82,7 @@ Options:
   -?, -h, --help                           Show command line help.
 "@ -split "`r?`n"
 
-      $dotnet_help = @"
+            $dotnet_help = @"
 Usage: dotnet [runtime-options] [path-to-application] [arguments]
 
 Execute a .NET application.
@@ -143,103 +143,164 @@ Additional commands from bundled tools:
 
 Run 'dotnet [command] --help' for more information on a command.
 "@ -split "`r?`n"
-    }
+        }
 
-    Context "Parse dotnet list --help" {
-      it "return options with help text" {
-        $expected = @(
-          @{ Name = "-?"; HelpText = "Show command line help."; Args = $null },
-          @{ Name = "-h"; HelpText = "Show command line help."; Args = $null },
-          @{ Name = "--help"; HelpText = "Show command line help." ; Args = $null }
-        ) | objectify
+        Context "Parse dotnet list --help" {
+            it "return options with help text" {
+                $expected = @(
+                    @{ Name = "-?"; HelpText = "Show command line help."; Args = $null },
+                    @{ Name = "-h"; HelpText = "Show command line help."; Args = $null },
+                    @{ Name = "--help"; HelpText = "Show command line help." ; Args = $null }
+                ) | objectify
 
-        $actual = ExctractParseables $dotnet_list
-        | Where-Object Kind -eq Options 
-        | ForEach-Object Text
-        | ForEach-Object { ParseOption $_ }
+                $actual = ExctractParseables $dotnet_list
+                | Where-Object Kind -eq Options 
+                | ForEach-Object Text
+                | ForEach-Object { ParseOption $_ }
 
-        $actual | Should -HaveSameProperties $expected
-      }
+                $actual | Should -HaveSameProperties $expected
+            }
 
-      it "return commands with help text" {
-        $expected = @(
-          @{ Name = "package"; HelpText = "List all package references of the project or solution." }
-          @{ Name = "reference"; HelpText = "List all project-to-project references of the project." }
-        ) | objectify
+            it "return commands with help text" {
+                $expected = @(
+                    @{ Name = "package"; HelpText = "List all package references of the project or solution." }
+                    @{ Name = "reference"; HelpText = "List all project-to-project references of the project." }
+                ) | objectify
 
-        $actual = ExctractParseables $dotnet_list 
-        | Where-Object Kind -eq Commands 
-        | ForEach-Object Text
-        | ForEach-Object { ParseCommand $_ }
+                $actual = ExctractParseables $dotnet_list 
+                | Where-Object Kind -eq Commands 
+                | ForEach-Object Text
+                | ForEach-Object { ParseCommand $_ }
  
-        $actual | Should -HaveSameProperties $expected
-      }
-    }
+                $actual | Should -HaveSameProperties $expected
+            }
+        }
 
-    Context "Parse dotnet list package --help" {
-      it "return options with help text" {
-        $expected = @(
-          @{ Name = "-v"; HelpText = "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."; Args = "<LEVEL>" },
-          @{ Name = "--verbosity"; HelpText = "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."; Args = "<LEVEL>" },
-          @{ Name = "--outdated"; HelpText = "Lists packages that have newer versions. Cannot be combined with '--deprecated' or '--vulnerable' options."; Args = $null },
-          @{ Name = "--deprecated"; HelpText = "Lists packages that have been deprecated. Cannot be combined with '--vulnerable' or '--outdated' options."; Args = $null },
-          @{ Name = "--vulnerable"; HelpText = "Lists packages that have known vulnerabilities. Cannot be combined with '--deprecated' or '--outdated' options."; Args = $null },
-          @{ Name = "--framework <FRAMEWORK | FRAMEWORK\RID>"; HelpText = "Chooses a framework to show its packages. Use the option multiple times for multiple frameworks."; Args = "<FRAMEWORK | FRAMEWORK\RID>" },
-          @{ Name = "--include-transitive"; HelpText = "Lists transitive and top-level packages." ; Args = $null },
-          @{ Name = "--include-prerelease"; HelpText = "Consider packages with prerelease versions when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
-          @{ Name = "--highest-patch"; HelpText = "Consider only the packages with a matching major and minor version numbers when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
-          @{ Name = "--highest-minor"; HelpText = "Consider only the packages with a matching major version number when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
-          @{ Name = "--config <CONFIG_FILE>"; HelpText = "The path to the NuGet config file to use. Requires the '--outdated', '--deprecated' or '--vulnerable' option."; Args = "<CONFIG_FILE>" },
-          @{ Name = "--source <SOURCE>"; HelpText = "The NuGet sources to use when searching for newer packages. Requires the '--outdated', '--deprecated' or '--vulnerable' option."; Args = "<SOURCE>" },
-          @{ Name = "--interactive"; HelpText = "Allows the command to stop and wait for user input or action (for example to complete authentication)." ; Args = $null },
-          @{ Name = "--format <console|json>"; HelpText = "Specifies the output format type for the list packages command." ; Args = "<console|json>" },
-          @{ Name = "--output-version <output-version>"; HelpText = "Specifies the version of machine-readable output. Requires the '--format json' option." ; Args = $null },
-          @{ Name = "-?"; HelpText = "Show command line help."; Args = $null }
-          @{ Name = "-h"; HelpText = "Show command line help."; Args = $null }
-          @{ Name = "--help"; HelpText = "Show command line help."; Args = $null }
-        ) | objectify
+        Context "Parse dotnet list package --help" {
+            it "return options with help text" {
+                $expected = @(
+                    @{ Name = "-v"; HelpText = "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."; Args = "<LEVEL>" },
+                    @{ Name = "--verbosity"; HelpText = "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."; Args = "<LEVEL>" },
+                    @{ Name = "--outdated"; HelpText = "Lists packages that have newer versions. Cannot be combined with '--deprecated' or '--vulnerable' options."; Args = $null },
+                    @{ Name = "--deprecated"; HelpText = "Lists packages that have been deprecated. Cannot be combined with '--vulnerable' or '--outdated' options."; Args = $null },
+                    @{ Name = "--vulnerable"; HelpText = "Lists packages that have known vulnerabilities. Cannot be combined with '--deprecated' or '--outdated' options."; Args = $null },
+                    @{ Name = "--framework <FRAMEWORK | FRAMEWORK\RID>"; HelpText = "Chooses a framework to show its packages. Use the option multiple times for multiple frameworks."; Args = "<FRAMEWORK | FRAMEWORK\RID>" },
+                    @{ Name = "--include-transitive"; HelpText = "Lists transitive and top-level packages." ; Args = $null },
+                    @{ Name = "--include-prerelease"; HelpText = "Consider packages with prerelease versions when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
+                    @{ Name = "--highest-patch"; HelpText = "Consider only the packages with a matching major and minor version numbers when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
+                    @{ Name = "--highest-minor"; HelpText = "Consider only the packages with a matching major version number when searching for newer packages. Requires the '--outdated' option." ; Args = $null },
+                    @{ Name = "--config <CONFIG_FILE>"; HelpText = "The path to the NuGet config file to use. Requires the '--outdated', '--deprecated' or '--vulnerable' option."; Args = "<CONFIG_FILE>" },
+                    @{ Name = "--source <SOURCE>"; HelpText = "The NuGet sources to use when searching for newer packages. Requires the '--outdated', '--deprecated' or '--vulnerable' option."; Args = "<SOURCE>" },
+                    @{ Name = "--interactive"; HelpText = "Allows the command to stop and wait for user input or action (for example to complete authentication)." ; Args = $null },
+                    @{ Name = "--format <console|json>"; HelpText = "Specifies the output format type for the list packages command." ; Args = "<console|json>" },
+                    @{ Name = "--output-version <output-version>"; HelpText = "Specifies the version of machine-readable output. Requires the '--format json' option." ; Args = $null },
+                    @{ Name = "-?"; HelpText = "Show command line help."; Args = $null }
+                    @{ Name = "-h"; HelpText = "Show command line help."; Args = $null }
+                    @{ Name = "--help"; HelpText = "Show command line help."; Args = $null }
+                ) | objectify
 
-        $actual = ExctractParseables $dotnet_list_package 
-        | Where-Object Kind -eq Options 
-        | ForEach-Object Text
-        | ForEach-Object { ParseOption $_ }
+                $actual = ExctractParseables $dotnet_list_package 
+                | Where-Object Kind -eq Options 
+                | ForEach-Object Text
+                | ForEach-Object { ParseOption $_ }
                 
-        $actual | Should -HaveSameProperties $expected
-      }
+                $actual | Should -HaveSameProperties $expected
+            }
 
-      it "return commands with help text" {
-        $expected = @(
-          @{ Name = "package"; HelpText = "List all package references of the project or solution." }
-          @{ Name = "reference"; HelpText = "List all project-to-project references of the project." }
-        ) | objectify
+            it "return commands with help text" {
+                $expected = @(
+                    @{ Name = "package"; HelpText = "List all package references of the project or solution." }
+                    @{ Name = "reference"; HelpText = "List all project-to-project references of the project." }
+                ) | objectify
 
-        $actual = ExctractParseables $dotnet_list 
-        | Where-Object Kind -eq Commands
-        | ForEach-Object Text
-        | ForEach-Object { ParseCommand $_ }
+                $actual = ExctractParseables $dotnet_list 
+                | Where-Object Kind -eq Commands
+                | ForEach-Object Text
+                | ForEach-Object { ParseCommand $_ }
  
-        $actual | Should -HaveSameProperties $expected
-      }
+                $actual | Should -HaveSameProperties $expected
+            }
+        }
+
+        Context "Parse dotnet --help (multiple options and command segments)" {
+            it "Parse all options" {
+                $expected = @(
+                    @{Name = '--additionalprobingpath '; HelpText = 'Path containing probing policy and assemblies to probe for.'; Args = '<path>' },
+                    @{Name = '--additional-deps '; HelpText = 'Path to additional deps.json file.'; Args = '<path>' },
+                    @{Name = '--depsfile'; HelpText = 'Path to <application>.deps.json file.'; Args = $null },
+                    @{Name = '--fx-version '; HelpText = 'Version of the installed Shared Framework to use to run the application.'; Args = '<version>' },
+                    @{Name = '--roll-forward '; HelpText = 'Roll forward to framework version (LatestPatch, Minor, LatestMinor, Major, LatestMajor, Disable).'; Args = '<setting>' },
+                    @{Name = '--runtimeconfig'; HelpText = 'Path to <application>.runtimeconfig.json file.'; Args = $null },
+                    @{Name = '--diagnostics'; HelpText = 'Enable diagnostic output.'; Args = $null },
+                    @{Name = '-d'; HelpText = 'Enable diagnostic output.'; Args = $null },
+                    @{Name = '--help'; HelpText = 'Show command line help.'; Args = $null },
+                    @{Name = '-h'; HelpText = 'Show command line help.'; Args = $null },
+                    @{Name = '--info'; HelpText = 'Display .NET information.'; Args = $null },
+                    @{Name = '--list-runtimes'; HelpText = 'Display the installed runtimes.'; Args = $null },
+                    @{Name = '--list-sdks'; HelpText = 'Display the installed SDKs.'; Args = $null },
+                    @{Name = '--version'; HelpText = 'Display .NET SDK version in use.'; Args = $null }      
+                ) | objectify
+
+                $actual = ExctractParseables $dotnet_help 
+                | Where-Object Kind -match options
+                | ForEach-Object Text
+                | ForEach-Object { ParseOption $_ }
+ 
+                $actual | Should -HaveSameProperties $expected
+            }
+
+            it "Parse all commands" {
+                $expected = @(                  
+                    @{Name = 'add'; HelpText = 'Add a package or reference to a .NET project.' },
+                    @{Name = 'build'; HelpText = 'Build a .NET project.' },
+                    @{Name = 'build-server'; HelpText = 'Interact with servers started by a build.' },
+                    @{Name = 'clean'; HelpText = 'Clean build outputs of a .NET project.' },
+                    @{Name = 'format'; HelpText = 'Apply style preferences to a project or solution.' },
+                    @{Name = 'help'; HelpText = 'Show command line help.' },
+                    @{Name = 'list'; HelpText = 'List project references of a .NET project.' },
+                    @{Name = 'msbuild'; HelpText = 'Run Microsoft Build Engine (MSBuild) commands.' },
+                    @{Name = 'new'; HelpText = 'Create a new .NET project or file.' },
+                    @{Name = 'nuget'; HelpText = 'Provides additional NuGet commands.' },
+                    @{Name = 'pack'; HelpText = 'Create a NuGet package.' },
+                    @{Name = 'publish'; HelpText = 'Publish a .NET project for deployment.' },
+                    @{Name = 'remove'; HelpText = 'Remove a package or reference from a .NET project.' },
+                    @{Name = 'restore'; HelpText = 'Restore dependencies specified in a .NET project.' },
+                    @{Name = 'run'; HelpText = 'Build and run a .NET project output.' },
+                    @{Name = 'sdk'; HelpText = 'Manage .NET SDK installation.' },
+                    @{Name = 'sln'; HelpText = 'Modify Visual Studio solution files.' },
+                    @{Name = 'store'; HelpText = 'Store the specified assemblies in the runtime package store.' },
+                    @{Name = 'test'; HelpText = 'Run unit tests using the test runner specified in a .NET project.' },
+                    @{Name = 'tool'; HelpText = 'Install or manage tools that extend the .NET experience.' },
+                    @{Name = 'vstest'; HelpText = 'Run Microsoft Test Engine (VSTest) commands.' },
+                    @{Name = 'workload'; HelpText = 'Manage optional workloads.' },
+                    @{Name = 'dev-certs'; HelpText = 'Create and manage development certificates.' },
+                    @{Name = 'fsi'; HelpText = 'Start F# Interactive / execute F# scripts.' },
+                    @{Name = 'user-jwts'; HelpText = 'Manage JSON Web Tokens in development.' },
+                    @{Name = 'user-secrets'; HelpText = 'Manage development user secrets.' },
+                    @{Name = 'watch'; HelpText = 'Start a file watcher that runs a command when files change.' }
+                ) | objectify
+
+                $actual = ExctractParseables $dotnet_help 
+                | Where-Object Kind -match command
+                | ForEach-Object Text
+                | ForEach-Object { ParseCommand $_ }
+ 
+                $actual | Should -HaveSameProperties $expected
+            }
+        }
     }
 
-    Context "Parse dotnet --help (multiple options and command segments)" {
-      it "Parse all options" {
 
-      }
-    }
-  }
+    Describe "completion should return helptext as tooltip" {
 
+        BeforeAll {
+            . $PSScriptRoot/../src/common.ps1
+            . $PSScriptRoot/common.ps1
+        }
 
-  Describe "completion should return helptext as tooltip" {
-
-    BeforeAll {
-      . $PSScriptRoot/../src/common.ps1
-      . $PSScriptRoot/common.ps1
-    }
-
-    Context "no partial word" {
-      it "[dotnet list] -> list options with tooltip" {
-        $expected = @(
+        Context "no partial word" {
+            it "[dotnet list] -> list options with tooltip" {
+                $expected = @(
                     (CompletionResult "--help" "Show command line help."),
                     (CompletionResult "-?" "Show command line help."),
                     (CompletionResult "-h" "Show command line help."),
@@ -247,14 +308,14 @@ Run 'dotnet [command] --help' for more information on a command.
                     (CompletionResult "/h" "/h"),
                     (CompletionResult "package" "List all package references of the project or solution."),
                     (CompletionResult "reference" "List all project-to-project references of the project.")
-        )
+                )
             
-        $cmd = mockCommandAst @("dotnet", "list")
-        $wtc = ""
-        $actual = & $dotnet_scriptblock $wtc $cmd 12
+                $cmd = mockCommandAst @("dotnet", "list")
+                $wtc = ""
+                $actual = & $dotnet_scriptblock $wtc $cmd 12
             
-        $actual | Should -HaveSameProperties $expected
-      }
+                $actual | Should -HaveSameProperties $expected
+            }
+        }
     }
-  }
 }
