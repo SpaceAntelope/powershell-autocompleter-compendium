@@ -137,7 +137,10 @@ InModuleScope Take {
                 Result = 1..15
             },
             @{
-                Case = "Once"
+                Case   = "Once condition met it's over, even if later elements also conform"
+                Source = 1..15
+                While  = { $_ -lt 5 -or $_ -gt 10 }
+                Result = 1..4
             }
         )
     }
