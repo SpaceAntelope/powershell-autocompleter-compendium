@@ -6,8 +6,10 @@ function objectify {
         [hashtable]
         $dic
     )
-
-    [PSCustomObject]$dic
+    
+    Process {
+        [PSCustomObject]$_
+    }
 }
 
 function escape {
