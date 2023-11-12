@@ -26,31 +26,6 @@ function Join {
     }
 }
 
-function Take-While {
-    [CmdletBinding()]
-    param (
-        [Parameter(ValueFromPipeline)]
-        [Object]
-        $Value,
-        [Parameter(Mandatory, Position = 0)]
-        [scriptblock]
-        $Predicate
-    )
-
-    begin {
-        $predicateSatisfied = $true
-    }
-
-    process {
-        # write-host $predicateSatisfied $Predicate.InvokeWithContext($null, $_)
-        $vars = [List[psvariable]]::new()
-        $vars.Add([psvariable]::new("_", $_))
-        $predicateSatisfied = $predicateSatisfied ? $Predicate.InvokeWithContext($null, $vars) : $false
-        
-        if ($predicateSatisfied) { $_ }
-    }
-}
-
 function Take {
     [CmdletBinding(DefaultParameterSetName = "Take")]
     param (
