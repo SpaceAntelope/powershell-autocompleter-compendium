@@ -51,7 +51,7 @@ $dotnet_scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $commandline = $commandAst.CommandElements 
-    | Take -Until { -not(  $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete)) }
+    | Take -While { $_.Value -notmatch "^\-" -and ($_.Value -ne $wordToComplete -or -not $wordToComplete) }
 
     $commandline = $commandline.Value -join " "
 
