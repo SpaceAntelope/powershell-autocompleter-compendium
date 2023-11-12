@@ -52,24 +52,27 @@ function Take-While {
 }
 
 function Take {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = "Take")]
     param (
         [Parameter(ValueFromPipeline)]
         [Object]
         $Value,
-        [Parameter()]
+        [Parameter(ParameterSetName = "TakeFromUntil")]
         [scriptblock]
         $From,
-        [Parameter()]
+        [Parameter(ParameterSetName = "TakeFromUntil")]
         [scriptblock]
         $Until,
-        [Parameter()]
+        [Parameter(ParameterSetName = "TakeWhile")]
+        [scriptblock]
+        $While,
+        [Parameter(ParameterSetName = "TakeFromUntil")]
         [switch]
         $Inclusive
     )
 
     begin { 
-        $StartConditionMet = $false
+        $StartConditionMet = [bool]$While
         $StopConditionMet = $false
         $StartConditionAge = 0
         
@@ -79,37 +82,46 @@ function Take {
 
         if (-not $Until) {
             $Until = { $false }
-        }
-    }
+        }                                
+    }   
 
     process {
         $vars = [List[psvariable]]::new()
         $vars.Add([psvariable]::new("_", $_))
 
-        if ($StartConditionMet) {
-            $StartConditionAge++
+        if ($While) {
+            $StopConditionMet = $StopConditionMet -or -not $While.Invoke($null, $vars)
         }
+
+        if ($While -and -not $StopConditionMet) {
+            $_ 
+        }
+        else {
+            if ($StartConditionMet) {
+                $StartConditionAge++
+            }
        
-        if ($inclusive -and -not $StartConditionMet) {
-            <# After condition met, don't run From() again #>
-            $StartConditionMet = $From.InvokeWithContext($null, $vars)
-        }
+            if ($inclusive -and -not $StartConditionMet) {
+                <# After condition met, don't run From() again #>
+                $StartConditionMet = $From.InvokeWithContext($null, $vars)
+            }
 
-        if (-not $inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
-            <# Age > 0 prevents terminal condition from being set immediately if it is the same as the start condition #>
-            $StopConditionMet = $Until.InvokeWithContext($null, $vars)
-        }
+            if (-not $inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
+                <# Age > 0 prevents terminal condition from being set immediately if it is the same as the start condition #>
+                $StopConditionMet = $Until.InvokeWithContext($null, $vars)
+            }
         
-        if ($StartConditionMet -and -not $StopConditionMet) {
-            $_
-        }
+            if ($StartConditionMet -and -not $StopConditionMet) {
+                $_
+            }
 
-        if ($inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
-            $StopConditionMet = $Until.InvokeWithContext($null, $vars)
-        }
+            if ($inclusive -and $StartConditionMet -and -not $StopConditionMet -and $StartConditionAge -gt 0) {
+                $StopConditionMet = $Until.InvokeWithContext($null, $vars)
+            }
 
-        if (-not $inclusive -and -not $StartConditionMet) {
-            $StartConditionMet = $From.InvokeWithContext($null, $vars)
+            if (-not $inclusive -and -not $StartConditionMet) {
+                $StartConditionMet = $From.InvokeWithContext($null, $vars)
+            }
         }
     }
 }
